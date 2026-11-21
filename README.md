@@ -522,6 +522,58 @@ How it differs from the hook, on purpose — you asked for *this* rewrite:
 Exit codes: `0` done, `1` the rewrite failed, `2` usage error. When writing a
 file, the absolute path written is printed on stdout.
 
+## pi-coding-agent extension
+
+The same rewrite runs inside pi-coding-agent, as a single-file extension at
+`pi/claudish.ts`. Install it from this checkout:
+
+```bash
+pi install /abs/path/to/claudish-to-english/pi/claudish.ts
+```
+
+or put that absolute path in `"extensions"` in pi's settings. The checkout has
+to stay where it is: the extension calls the scripts in this folder instead of
+carrying its own copy, which is the point — one prompt, one provider layer, one
+set of language and style rules, and a fix to any of them reaches both tools.
+
+Everything above applies unchanged:
+
+| Here | In pi |
+|---|---|
+| `MessageDisplay` rewrite of each assistant message | a display-only Markdown transform on assistant messages |
+| `/claudish` — dashboard, `last`, `file`, `cycle`, `reset` | `/claudish`, same command, same output |
+| `SessionStart` notice about leftover overrides | one warning line at session start |
+| opt-in Markdown rewrite after `Write` / `Edit` | same, after pi's `write` / `edit` tools |
+
+The `~/.claude/claudish-*` flag files and the `CLAUDISH_*` variables are shared,
+so `/claudish style tldr` in Claude also changes pi's next message. pi has no
+`env` block for an extension: export the variables in the shell that starts pi,
+or use `/claudish`, which persists in the flag files.
+
+Where it differs, and why:
+
+- **A rewrite holds message end for up to 60s.** pi's Markdown transform is
+  synchronous and cannot await a model, so the text is rewritten before the
+  final render rather than after it. It fails open the same way: no answer, no
+  wait, original text.
+- **One text block per message is rewritten.** Each block goes through its own
+  Markdown instance, so a rewrite cannot be spread across two of them; messages
+  with several blocks, or none, stay as written and are never hidden — not even
+  in `replace` mode, where hiding one would leave an empty message on screen.
+- **append mode reads exactly like the plugin's** — original, label, rewrite —
+  because it arrives as one finished string. A `replace`-mode message shows
+  nothing while it streams, as in the plugin, unless it turns out to have
+  several blocks: then it streams as written, like every other message that
+  cannot be rewritten.
+- **Nothing survives a restart.** Rewrites are kept in memory for the session,
+  so a resumed session shows the originals again instead of paying a model call
+  per restored message.
+- **`/claudish last` reads pi's session**, not the `~/.claude/projects`
+  transcripts.
+- **`/claudish file` names the file without language and model**, and the
+  two-minute cap described above does not apply, so a slow model is fine.
+- **`.claude/settings.json` is not read** — that is Claude's config file.
+
 ---
 
 ## Providers
@@ -734,6 +786,8 @@ claudish-to-english/
 │   └── claudish.md         # /claudish slash command (runtime on/off, mode, language, model, last, file)
 ├── hooks/
 │   └── hooks.json          # SessionStart -> session-notice.sh ; MessageDisplay -> rewrite.sh ; PostToolUse -> rewrite-md.sh
+├── pi/
+│   └── claudish.ts         # pi-coding-agent extension — drives the same scripts, display-only
 ├── rewrite.sh              # display-rewrite hook
 ├── rewrite-md.sh           # markdown-file rewrite hook (opt-in)
 ├── claudish-md.sh          # on-demand rewrite of a file or stdin (CLI; backs /claudish file)

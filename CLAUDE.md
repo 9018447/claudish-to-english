@@ -23,6 +23,7 @@ the two ever disagree.
 | `lang.sh` | output-language resolver + the sanitiser for untrusted config values. Sourced by both hooks and the CLI |
 | `commands/claudish.md` | the `/claudish` slash command |
 | `hooks/hooks.json` | wires the three hooks |
+| `pi/claudish.ts` | pi-coding-agent extension — an adapter that feeds pi's events to the scripts above; owns no prompt or provider logic |
 
 Config precedence is consistent throughout: **flag file > env var > settings
 file > built-in default**. Flag files exist because env vars are frozen at
@@ -71,6 +72,55 @@ To exercise the plugin in a real session, point a scratch project's
 `"enabledPlugins": { "claudish-to-english@gvzdv-plugins": false }` — otherwise
 the installed copy and the working copy both fire on the same message and
 whichever writes last wins.
+
+## The pi adapter
+
+`pi/claudish.ts` is the only TypeScript in the repo, and it is deliberately an
+adapter: no prompt, no provider layer, no language rule of its own. It turns
+pi's events into the payloads the scripts already take, and their replies into
+pi's display channels. Behaviour changes therefore belong in the scripts — the
+extension should need no edit. Adding an event it forwards means keeping the
+payload shape the script reads.
+
+Two pieces must not drift:
+
+- **`readMode()` mirrors `rewrite.sh:85-101`.** pi's Markdown transform is
+  synchronous and runs on every render, so it cannot ask bash whether replace
+  mode is on. It re-reads the env vars and flag files at `message_start`
+  instead, which is why a `/claudish` change lands on the next message. Same
+  files, same variables, same rule that only `append` and `replace` count,
+  and the same gate on `CLAUDISH_ENABLED`: only the exact value `1` (the unset
+  default) enables rewriting, as in `rewrite.sh:162`, so a stray `true` cannot
+  leave replace mode hiding a stream that passes through unchanged.
+- **The rewrite cache is keyed by message text, not by id or timestamp.** pi
+  builds the streaming component before a message has either, so the transform
+  context carries `messageId: undefined, timestamp: undefined` for live
+  messages; the trimmed single text block it is handed is the only stable key.
+  The rewrite also depends on the user's question and the style/language, so an
+  identical message can share the newer rewrite; only its wording differs.
+  Rewrites stay in memory: never write one into the session, or the display-only
+  promise breaks.
+
+Test it the same way as a hook — `CLAUDISH_STUB=1` plus the `*_FILE=/nonexistent`
+redirects, e.g. `CLAUDISH_STUB=1 pi -e ./pi/claudish.ts`. There is no build step
+and no test suite.
+
+There is also no `package.json`, so a bare `tsc --noEmit` cannot resolve pi's
+types. Point a throwaway tsconfig at the installed release:
+
+```sh
+PI_NM="$HOME/.pi/agent/install/releases/$(cat "$HOME/.pi/agent/install/current-version")/node_modules"
+cat > /tmp/pi-tsconfig.json <<JSON
+{ "compilerOptions": { "strict": true, "noEmit": true, "skipLibCheck": true,
+    "target": "ES2022", "module": "ESNext", "moduleResolution": "Bundler",
+    "types": ["node"], "typeRoots": ["$PI_NM/@types"],
+    "paths": {
+      "@earendil-works/pi-coding-agent": ["$PI_NM/@earendil-works/pi-coding-agent/dist/index.d.ts"],
+      "@earendil-works/pi-tui": ["$PI_NM/@earendil-works/pi-tui/dist/index.d.ts"] } },
+  "include": ["$PWD/pi/claudish.ts"] }
+JSON
+npx -y -p typescript tsc -p /tmp/pi-tsconfig.json
+```
 
 ## Repo-specific traps
 

@@ -203,6 +203,18 @@ and both the hook and the CLI follow. The two callers differ only in failure
 policy. The hook passes through silently; the CLI refuses to run without all
 three libraries and reports every failure.
 
+### The pi extension is a fifth caller, and it must stay logic-free
+
+`pi/claudish.ts` runs the same scripts inside pi-coding-agent. It is an
+adapter — payload in, display out — and holds no prompt, provider, or language
+rule of its own, so a behaviour change lands in the scripts and the extension
+follows. A new style preset in particular needs no edit there. Two things must
+stay in step: its `readMode()` mirrors `rewrite.sh:85-101` (pi's Markdown
+transform is synchronous, so the mode is re-read at message start instead of
+asking bash), and its rewrite cache is keyed by message text, because the
+transform context of a live message has no id and no timestamp.
+`CLAUDISH_STUB=1 pi -e ./pi/claudish.ts` exercises it with no provider.
+
 ---
 
 ## Opening a pull request

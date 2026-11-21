@@ -5,6 +5,41 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **A pi-coding-agent extension.** `pi/claudish.ts` brings the display rewrite
+  and `/claudish` to pi, for people who use both tools and want one set of
+  settings. It is an adapter rather than a port: it feeds pi's events to
+  `rewrite.sh`, `rewrite-md.sh`, `session-notice.sh`, and `claudish-ctl.sh`
+  as the payloads those scripts already expect, so prompts, providers, language
+  handling, style presets, and failure text stay identical, and a change to any
+  of them reaches both tools. Display-only and fail-open in both.
+  - The rewrite runs at message end, before the final render, because pi's
+    Markdown transform is synchronous; append mode therefore shows original,
+    label, and rewrite in one pass, at the same single model call.
+  - `/claudish` is the same command with the same dashboard, `last` (read from
+    pi's own session), `file`, and the state-changing forms.
+    `~/.claude/claudish-*` flag files are shared with the Claude plugin.
+  - The differences are documented in the README so they are not mistaken for
+    regressions: one text block per message, a 60s hold on message end, and no
+    rewrites kept across restarts.
+
+### Fixed
+- **`replace` mode no longer blanks a message the extension cannot rewrite.**
+  pi renders each text block through its own Markdown instance, so only a
+  message with exactly one block can be rewritten; a multi-block message was
+  hidden for the whole stream and then appeared in full at the end. The
+  adapter now counts blocks as they arrive and hides only a message that will
+  still be rewritten, so the original is readable from the second block on.
+  - `CLAUDISH_ENABLED` counts only when it is exactly `1`, the same gate as
+    `rewrite.sh:162`. A value like `true` passes through unrewritten there, and
+    replace mode no longer hides that stream as if a rewrite were coming.
+  - Flag files are tested as regular files, like the scripts' `[ -f ]`: a
+    directory named `claudish-off` is not an off switch.
+  - A session id that sanitises to `.` or `..` becomes `nosession`, because
+    `rewrite.sh` builds its buffer directory from that field as-is.
+
 ## [0.10.0] - 2026-10-09
 
 ### Added
