@@ -101,6 +101,19 @@ Two pieces must not drift:
   identical message can share the newer rewrite; only its wording differs.
   Rewrites stay in memory: never write one into the session, or the display-only
   promise breaks.
+- **pi reads its own config, never Claude's.** A pi session and a Claude Code
+  session are separate hosts: the same flag file would mean `/claudish replace`
+  in one silently changing the other's next message. So the extension sets
+  `CLAUDISH_CONFIG_DIR` to pi's agent directory (`$PI_CODING_AGENT_DIR`,
+  default `~/.pi/agent`) for every script it runs, and the five `claudish-*`
+  flag files resolve there instead of `~/.claude`. The variables a rewrite
+  needs (provider, model, URL, key, language, prompt file) come from
+  `<agent-dir>/claudish.env`, one `KEY=value` per line, because pi has no
+  settings `env` block to export; `readClaudishEnv` lets a non-empty variable
+  already in pi's environment win and passes the result as `KEY=value` argv to
+  `env` — never spliced into the shell string. `readMode` reads the same map,
+  so a `CLAUDISH_MODE` there applies too. Do not reintroduce a read of
+  `~/.claude/settings.json`: that is what made the two hosts share state.
 
 Test it the same way as a hook — `CLAUDISH_STUB=1` plus the `*_FILE=/nonexistent`
 redirects, e.g. `CLAUDISH_STUB=1 pi -e ./pi/claudish.ts`. There is no build step
@@ -137,6 +150,15 @@ Each of these has caused a real regression.
 `style_source`, dashboard, validation + error text), `session-notice.sh`
 (persisted-override warning), `commands/claudish.md` (`description`,
 `argument-hint`). Plus `README.md` and `CHANGELOG.md`.
+
+**A flag file is resolved in six scripts.** `rewrite.sh` (off/mode/style),
+`lang.sh` (lang), `providers.sh` (model), `claudish-ctl.sh` (all five),
+`session-notice.sh` (all five) and `rewrite-md.sh` (off) each build their path
+from `${CLAUDISH_CONFIG_DIR:-$HOME/.claude}/claudish-*`. Miss one and that
+script silently keeps reading `~/.claude` while the others read the configured
+directory — the split only shows up as a switch that works in one host and not
+the other. `CLAUDE.md`'s "Config precedence" line still holds: an individual
+`*_FILE` beats the directory.
 
 **Never emit ANSI escape codes.** `displayContent` is rendered as markdown —
 use `**bold**`. Colour codes are palette indices a terminal theme may remap onto

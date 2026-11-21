@@ -31,11 +31,14 @@ SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
 # pipe keeps the hook well-behaved.
 cat >/dev/null 2>&1 || true
 
-OFF_FILE="${CLAUDISH_OFF_FILE:-$HOME/.claude/claudish-off}"
-MODE_FILE="${CLAUDISH_MODE_FILE:-$HOME/.claude/claudish-mode}"
-STYLE_FILE="${CLAUDISH_STYLE_FILE:-$HOME/.claude/claudish-style}"
-LANG_FILE="${CLAUDISH_LANG_FILE:-$HOME/.claude/claudish-lang}"
-MODEL_FILE="${CLAUDISH_MODEL_FILE:-$HOME/.claude/claudish-model}"
+# The pi adapter sets CLAUDISH_CONFIG_DIR, so the notice only speaks about the
+# flag files of the host that is starting.
+_cl_cfg="${CLAUDISH_CONFIG_DIR:-${HOME:-}/.claude}"
+OFF_FILE="${CLAUDISH_OFF_FILE:-$_cl_cfg/claudish-off}"
+MODE_FILE="${CLAUDISH_MODE_FILE:-$_cl_cfg/claudish-mode}"
+STYLE_FILE="${CLAUDISH_STYLE_FILE:-$_cl_cfg/claudish-style}"
+LANG_FILE="${CLAUDISH_LANG_FILE:-$_cl_cfg/claudish-lang}"
+MODEL_FILE="${CLAUDISH_MODEL_FILE:-$_cl_cfg/claudish-model}"
 
 parts=""
 add() { parts="${parts:+$parts, }$1"; }

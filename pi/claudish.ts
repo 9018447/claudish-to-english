@@ -122,6 +122,67 @@ async function isFile(path: string): Promise<boolean> {
 	}
 }
 
+/**
+ * pi's own settings, never Claude's.
+ *
+ * Claude Code exports the `env` block of its settings files to hooks; pi has no
+ * such mechanism, and the config that makes a rewrite work at all — provider,
+ * model, base URL, key, language, prompt file — has to come from somewhere. It
+ * comes from `<agent-dir>/claudish.env`, one `KEY=value` per line, rather than
+ * from `~/.claude/settings.json`: a pi session and a Claude Code session are
+ * separate hosts, and editing one host's settings must not change the other's.
+ * The flag files follow the same rule through CLAUDISH_CONFIG_DIR, set here to
+ * the agent directory.
+ *
+ * A non-empty variable already in pi's environment wins, matching the plugin's
+ * flag > env > settings rule. The values are passed as argv to `env` (never
+ * spliced into a shell string), so a key with spaces or quotes cannot change the
+ * command. A missing or malformed file is ignored, like every other config read
+ * here.
+ */
+function piAgentDir(): string {
+	const configured = process.env.PI_CODING_AGENT_DIR?.trim();
+	if (!configured) return join(homedir(), ".pi", "agent");
+	return configured.startsWith("~/") ? join(homedir(), configured.slice(2)) : configured;
+}
+
+/** `KEY=value` lines; `#` comments, blank lines, `export ` and one pair of quotes are tolerated. */
+function parseEnvFile(text: string): Record<string, string> {
+	const result: Record<string, string> = {};
+	for (const line of text.split("\n")) {
+		const match = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line);
+		if (!match) continue;
+		result[match[1]] = match[2].replace(/^(['"])(.*)\1$/, "$2");
+	}
+	return result;
+}
+
+let claudishEnv: Promise<Record<string, string>> | undefined;
+
+function loadClaudishEnv(): Promise<Record<string, string>> {
+	claudishEnv ??= readClaudishEnv();
+	return claudishEnv;
+}
+
+async function readClaudishEnv(): Promise<Record<string, string>> {
+	const fromProcess: Record<string, string> = {};
+	for (const [key, value] of Object.entries(process.env)) {
+		if (key.startsWith("CLAUDISH_") && value !== undefined && value !== "") fromProcess[key] = value;
+	}
+
+	const dir = piAgentDir();
+	let fromFile: Record<string, string> = {};
+	try {
+		fromFile = parseEnvFile(await readFile(join(dir, "claudish.env"), "utf8"));
+	} catch {
+		// No file: the scripts' own defaults apply, as they would for a plain hook.
+	}
+
+	const merged = { ...fromFile, ...fromProcess };
+	merged.CLAUDISH_CONFIG_DIR ||= dir;
+	return merged;
+}
+
 /** Non-empty text blocks — the unit the transformer, message_end and pi all see. */
 function textBlocks(content: unknown): { type: "text"; text: string }[] {
 	return (Array.isArray(content) ? content : []).filter(
@@ -176,9 +237,15 @@ async function runScript(
 		const stdin = typeof options.stdin === "function" ? options.stdin(dir) : (options.stdin ?? "");
 		await writeFile(inputPath, stdin, "utf8");
 
+		// pi's own settings, because pi has no hook env mechanism. Empty when the
+		// user has no claudish.env; the scripts' own defaults then apply.
+		const env = await loadClaudishEnv();
+		const pairs = Object.entries(env).map(([key, value]) => `${key}=${value}`);
 		const result = await pi.exec(
-			"bash",
+			pairs.length ? "env" : "bash",
 			[
+				...(pairs.length ? pairs : []),
+				...(pairs.length ? ["bash"] : []),
 				"-c",
 				'script=$1; input=$2; shift 2; exec "$script" "$@" < "$input"',
 				"_",
@@ -207,15 +274,18 @@ async function runScript(
  * append and replace count.
  */
 async function readMode(): Promise<ModeState> {
-	// rewrite.sh:85,162 uses the value verbatim and passes through unless it is
-	// exactly "1" (which the unset default supplies): "true" or "yes" is off
-	// there, so replace mode must not hide a stream the script will not rewrite.
-	let enabled = ((process.env.CLAUDISH_ENABLED ?? "").trim() || "1") === "1";
-	const offFile = process.env.CLAUDISH_OFF_FILE?.trim() || join(homedir(), ".claude", "claudish-off");
+	// Same precedence as runScript: pi's own environment and claudish.env.
+	// rewrite.sh uses the value verbatim and passes through unless it is exactly
+	// "1" (which the unset default supplies): "true" or "yes" is off there, so
+	// replace mode must not hide a stream the script will not rewrite.
+	const env = await loadClaudishEnv();
+	const dir = env.CLAUDISH_CONFIG_DIR ?? piAgentDir();
+	let enabled = ((env.CLAUDISH_ENABLED ?? "").trim() || "1") === "1";
+	const offFile = env.CLAUDISH_OFF_FILE?.trim() || join(dir, "claudish-off");
 	if (await isFile(offFile)) enabled = false;
 
-	let mode: DisplayMode = process.env.CLAUDISH_MODE === "replace" ? "replace" : "append";
-	const modeFile = process.env.CLAUDISH_MODE_FILE?.trim() || join(homedir(), ".claude", "claudish-mode");
+	let mode: DisplayMode = env.CLAUDISH_MODE === "replace" ? "replace" : "append";
+	const modeFile = env.CLAUDISH_MODE_FILE?.trim() || join(dir, "claudish-mode");
 	if (await isFile(modeFile)) {
 		const stored = (await readFile(modeFile, "utf8").catch(() => "")).replace(/\s+/g, "");
 		if (stored === "append" || stored === "replace") mode = stored;
@@ -341,7 +411,7 @@ export default function claudish(pi: ExtensionAPI) {
 
 	// --- display rewrite ---------------------------------------------------
 
-	pi.on("message_start", async (event) => {
+	pi.on("message_start", async (event, ctx) => {
 		if (event.message.role !== "assistant") return;
 		streamBlocks = 0;
 		streaming = await readMode();

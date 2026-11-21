@@ -20,7 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     label, and rewrite in one pass, at the same single model call.
   - `/claudish` is the same command with the same dashboard, `last` (read from
     pi's own session), `file`, and the state-changing forms.
-    `~/.claude/claudish-*` flag files are shared with the Claude plugin.
+  - pi and Claude Code keep separate state. The scripts resolve their five
+    flag files under `CLAUDISH_CONFIG_DIR` (default `~/.claude`), and the
+    extension sets it to pi's agent directory, so `/claudish replace` in pi
+    writes `~/.pi/agent/claudish-mode` and leaves `~/.claude/claudish-mode`
+    alone. Provider, model, key, language and prompt file come from
+    `<agent-dir>/claudish.env` instead of Claude's `settings.json`, so editing
+    one host's settings cannot change the other's rewrites.
   - The differences are documented in the README so they are not mistaken for
     regressions: one text block per message, a 60s hold on message end, and no
     rewrites kept across restarts.
@@ -39,6 +45,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     directory named `claudish-off` is not an off switch.
   - A session id that sanitises to `.` or `..` becomes `nosession`, because
     `rewrite.sh` builds its buffer directory from that field as-is.
+- **The pi extension now finds the configuration that actually works.** Claude
+  Code exports the `env` block of its settings files to hooks; pi has no such
+  mechanism, so the extension saw none of it and fell back to the scripts'
+  defaults — for a magpie setup that meant the ollama default model, a failed
+  call, and a silent fail-open, with no rewrite ever shown. pi now reads
+  `<agent-dir>/claudish.env` for `CLAUDISH_*` keys, with a variable already in
+  pi's environment taking precedence. Values are passed to the scripts as `env`
+  argv, not spliced into a shell string, and `readMode` reads the same map, so
+  `CLAUDISH_MODE`/`CLAUDISH_ENABLED` set there apply.
 - **`pi install <repository url>` now finds the extension.** A root
   `package.json` declares `"pi": {"extensions": ["./pi/claudish.ts"]}`. pi
   discovers package resources through that manifest and otherwise only looks

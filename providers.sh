@@ -98,7 +98,7 @@ esac
 # resolved above; `/claudish model default` removes it and restores that.
 # Sanitised to the characters model names use — the value also lands on the
 # request. Provider-agnostic: X is passed to whatever provider is configured.
-_model_file="${CLAUDISH_MODEL_FILE:-${HOME:-}/.claude/claudish-model}"
+_model_file="${CLAUDISH_MODEL_FILE:-${CLAUDISH_CONFIG_DIR:-${HOME:-}/.claude}/claudish-model}"
 if [ -f "$_model_file" ]; then
   _mf="$(head -c 128 "$_model_file" 2>/dev/null | tr -cd 'A-Za-z0-9:._/-' | head -c 64)"
   [ -n "$_mf" ] && MODEL="$_mf"

@@ -4,11 +4,14 @@
 #
 # The hooks re-read flag files on every message, so switches take effect mid-
 # session where the frozen env cannot:
-#   off-file   (default ~/.claude/claudish-off)    exists -> rewrites paused
-#   mode-file  (default ~/.claude/claudish-mode)   append|replace -> display mode
-#   style-file (default ~/.claude/claudish-style)  tldr|5y|caveman -> rewrite style (display hook)
-#   lang-file  (default ~/.claude/claudish-lang)   rewrite language (see lang.sh)
-#   model-file (default ~/.claude/claudish-model)  model (see providers.sh)
+# All five live in $CLAUDISH_CONFIG_DIR (default ~/.claude), so each host keeps
+# its own set: the pi adapter passes ~/.pi/agent and a switch flipped there never
+# reaches a Claude Code session. An individual *_FILE still wins.
+#   off-file   (<config-dir>/claudish-off)    exists -> rewrites paused
+#   mode-file  (<config-dir>/claudish-mode)   append|replace -> display mode
+#   style-file (<config-dir>/claudish-style)  tldr|5y|caveman -> rewrite style (display hook)
+#   lang-file  (<config-dir>/claudish-lang)   rewrite language (see lang.sh)
+#   model-file (<config-dir>/claudish-model)  model (see providers.sh)
 # rewrite.sh reads mode/style; lang/model/off are shared with rewrite-md.sh.
 # They PERSIST across sessions (like the off-file) until cleared — the dashboard
 # flags any that are in force so that persistence is never a silent surprise,
@@ -51,11 +54,12 @@ set -uo pipefail
 
 SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-OFF_FILE="${CLAUDISH_OFF_FILE:-$HOME/.claude/claudish-off}"
-MODE_FILE="${CLAUDISH_MODE_FILE:-$HOME/.claude/claudish-mode}"
-STYLE_FILE="${CLAUDISH_STYLE_FILE:-$HOME/.claude/claudish-style}"
-LANG_FILE="${CLAUDISH_LANG_FILE:-$HOME/.claude/claudish-lang}"
-MODEL_FILE="${CLAUDISH_MODEL_FILE:-$HOME/.claude/claudish-model}"
+_cl_cfg="${CLAUDISH_CONFIG_DIR:-${HOME:-}/.claude}"
+OFF_FILE="${CLAUDISH_OFF_FILE:-$_cl_cfg/claudish-off}"
+MODE_FILE="${CLAUDISH_MODE_FILE:-$_cl_cfg/claudish-mode}"
+STYLE_FILE="${CLAUDISH_STYLE_FILE:-$_cl_cfg/claudish-style}"
+LANG_FILE="${CLAUDISH_LANG_FILE:-$_cl_cfg/claudish-lang}"
+MODEL_FILE="${CLAUDISH_MODEL_FILE:-$_cl_cfg/claudish-model}"
 
 # The /claudish slash command hands the user's whole argument string to us as a
 # QUOTED here-doc on stdin (invoked as `claudish-ctl.sh --stdin-args`). A quoted
@@ -207,7 +211,7 @@ dashboard() {
   printf '  other    /claudish last · cycle · reset (clear all overrides) · status\n'
   printf '  files    /claudish file <path>  → NAME.plain.md · terminal: %s/claudish-md.sh --help\n' "$SELF_DIR"
   if [ "$WARN" = "1" ]; then
-    printf '\n  ⚠ lines above are /claudish overrides in ~/.claude/claudish-* that persist\n'
+    printf '\n  ⚠ lines above are /claudish overrides in %s/claudish-* that persist\n' "$_cl_cfg"
     printf '    across sessions. Reset one with its `default` form, or all with /claudish reset.\n'
   fi
   printf '\n'

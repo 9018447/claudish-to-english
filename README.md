@@ -554,10 +554,19 @@ Everything above applies unchanged:
 | `SessionStart` notice about leftover overrides | one warning line at session start |
 | opt-in Markdown rewrite after `Write` / `Edit` | same, after pi's `write` / `edit` tools |
 
-The `~/.claude/claudish-*` flag files and the `CLAUDISH_*` variables are shared,
-so `/claudish style tldr` in Claude also changes pi's next message. pi has no
-`env` block for an extension: export the variables in the shell that starts pi,
-or use `/claudish`, which persists in the flag files.
+Nothing is shared with Claude Code: pi and Claude are separate hosts, so a
+switch flipped in one must not change the other's next message.
+
+- **The five flag files live in pi's own directory.** The scripts resolve
+  `<config-dir>/claudish-off`, `-mode`, `-style`, `-lang` and `-model`, where
+  `<config-dir>` is `CLAUDISH_CONFIG_DIR` (default `~/.claude`). The extension
+  sets it to pi's agent directory, `$PI_CODING_AGENT_DIR` or `~/.pi/agent`, so
+  `/claudish replace` in pi writes `~/.pi/agent/claudish-mode` and Claude's
+  `~/.claude/claudish-mode` stays as it was.
+- **The `CLAUDISH_*` variables come from `<agent-dir>/claudish.env`**, one
+  `KEY=value` per line (`#` comments and `export ` are fine). pi has no settings
+  `env` block to read, and reading Claude's would defeat the separation. A
+  variable already exported in the shell that starts pi wins over the file.
 
 Where it differs, and why:
 
@@ -581,7 +590,10 @@ Where it differs, and why:
   transcripts.
 - **`/claudish file` names the file without language and model**, and the
   two-minute cap described above does not apply, so a slow model is fine.
-- **`.claude/settings.json` is not read** — that is Claude's config file.
+- **Claude's `settings.json` is never read.** Provider, model, key, language
+  and prompt file for pi come from `<agent-dir>/claudish.env`; Claude Code
+  keeps its own copy in its own settings. Moving the pi values out of Claude's
+  settings is a one-time copy, not a shared file.
 
 ---
 
@@ -698,17 +710,18 @@ Notes:
 | Var | Default | Meaning |
 |---|---|---|
 | `CLAUDISH_ENABLED` | `1` | Master switch. `0` = pass everything through. Read once at session start. |
-| `CLAUDISH_OFF_FILE` | `~/.claude/claudish-off` | Runtime kill switch. While this file exists, rewrites pause — re-checked every message, so unlike env vars it works mid-session. See [Toggling mid-session](#toggling-mid-session). |
+| `CLAUDISH_CONFIG_DIR` | `~/.claude` | Directory holding the five `claudish-*` flag files below. The pi extension sets it to pi's agent directory (`$PI_CODING_AGENT_DIR`, default `~/.pi/agent`), so switches flipped in one host never reach the other. An individual `*_FILE` still wins. |
+| `CLAUDISH_OFF_FILE` | `<config-dir>/claudish-off` | Runtime kill switch. While this file exists, rewrites pause — re-checked every message, so unlike env vars it works mid-session. See [Toggling mid-session](#toggling-mid-session). |
 | `CLAUDISH_MODE` | `append` | `append` or `replace` (display hook). |
-| `CLAUDISH_MODE_FILE` | `~/.claude/claudish-mode` | Runtime display-mode override: `append`/`replace` in this file wins over `CLAUDISH_MODE`, re-checked every message. Written by `/claudish append`/`replace`. See [Controlling it live](#controlling-it-live-claudish). |
+| `CLAUDISH_MODE_FILE` | `<config-dir>/claudish-mode` | Runtime display-mode override: `append`/`replace` in this file wins over `CLAUDISH_MODE`, re-checked every message. Written by `/claudish append`/`replace`. See [Controlling it live](#controlling-it-live-claudish). |
 | `CLAUDISH_STYLE` | *(unset)* | Rewrite-style preset (display hook): `tldr` = a clearly shorter summary, `5y` = explain like I'm five, `caveman` = blunt caveman speak. Unset = the default plain-language rewrite. A usable `CLAUDISH_PROMPT_FILE` wins over any style (custom prompt > style > built-in); the output language still applies. |
-| `CLAUDISH_STYLE_FILE` | `~/.claude/claudish-style` | Runtime style override: `tldr`/`5y`/`caveman` in this file wins over `CLAUDISH_STYLE`, re-checked every message. Written by `/claudish style <tldr\|5y\|caveman>`. See [Controlling it live](#controlling-it-live-claudish). |
+| `CLAUDISH_STYLE_FILE` | `<config-dir>/claudish-style` | Runtime style override: `tldr`/`5y`/`caveman` in this file wins over `CLAUDISH_STYLE`, re-checked every message. Written by `/claudish style <tldr\|5y\|caveman>`. See [Controlling it live](#controlling-it-live-claudish). |
 | `CLAUDISH_PROMPT_FILE` | *(unset)* | Path to a file whose contents replace the display hook's system prompt (whole prompt, not merged). Empty/unreadable falls back to the built-in default. See [Customizing the rewrite prompt](#customizing-the-rewrite-prompt). |
 | `CLAUDISH_LANG` | *(unset)* | Language to rewrite into, e.g. `Esperanto`. Unset falls back to the `language` key in `.claude/settings*.json`; with neither set, the rewrite keeps the input's language. Empty ignores the settings key; `English` forces English. See [Output language](#output-language). |
-| `CLAUDISH_LANG_FILE` | `~/.claude/claudish-lang` | Runtime language override: a language name in this file wins over `CLAUDISH_LANG` and the settings key, re-checked every message. Written by `/claudish language <name>`. See [Controlling it live](#controlling-it-live-claudish). |
+| `CLAUDISH_LANG_FILE` | `<config-dir>/claudish-lang` | Runtime language override: a language name in this file wins over `CLAUDISH_LANG` and the settings key, re-checked every message. Written by `/claudish language <name>`. See [Controlling it live](#controlling-it-live-claudish). |
 | `CLAUDISH_PROVIDER` | `ollama` | `ollama`, `codex`, `anthropic`, or `openai` — which LLM serves rewrites (both hooks). |
 | `CLAUDISH_MODEL` | *(per provider)* | Model name; overrides the provider default (see [Providers](#providers)). The ollama default `gemma4:26b-mlx` is MLX (Apple-silicon only; Windows users must override). |
-| `CLAUDISH_MODEL_FILE` | `~/.claude/claudish-model` | Runtime model override: a model name in this file wins over `CLAUDISH_MODEL`, re-checked every message (applies to whatever provider is configured). Written by `/claudish model <name>`. See [Controlling it live](#controlling-it-live-claudish). |
+| `CLAUDISH_MODEL_FILE` | `<config-dir>/claudish-model` | Runtime model override: a model name in this file wins over `CLAUDISH_MODEL`, re-checked every message (applies to whatever provider is configured). Written by `/claudish model <name>`. See [Controlling it live](#controlling-it-live-claudish). |
 | `CLAUDISH_OLLAMA` | `http://localhost:11434` | ollama base URL. |
 | `CLAUDISH_ANTHROPIC_KEY` | *(unset)* | Anthropic API key; falls back to `ANTHROPIC_API_KEY`. |
 | `CLAUDISH_OPENAI_KEY` | *(unset)* | OpenAI(-compatible) API key; falls back to `OPENAI_API_KEY`. Only required for api.openai.com. |

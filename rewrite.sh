@@ -31,10 +31,16 @@
 #
 # Config (all via env, with safe defaults):
 #   CLAUDISH_ENABLED   1|0            master switch (default 1)
+#   CLAUDISH_CONFIG_DIR <dir>         directory holding the off/mode/style flag
+#                                          files (default ~/.claude). The pi
+#                                          adapter points it at ~/.pi/agent, so
+#                                          a switch flipped there never reaches
+#                                          a Claude Code session.
 #   CLAUDISH_OFF_FILE  <path>         flag file checked per message; when it
 #                                          exists, rewrites pause (default
-#                                          ~/.claude/claudish-off) — lets a
-#                                          hotkey/script toggle mid-session
+#                                          $CLAUDISH_CONFIG_DIR/claudish-off) —
+#                                          lets a hotkey/script toggle
+#                                          mid-session
 #   CLAUDISH_MODE      append|replace display strategy (default append)
 #   CLAUDISH_STYLE     tldr|5y|caveman  rewrite-style preset replacing the base
 #                                          prompt: "tldr" = a clearly shorter
@@ -86,13 +92,16 @@ ENABLED="${CLAUDISH_ENABLED:-1}"
 # Runtime kill switch: env is frozen at session launch, so a hotkey or script
 # can't flip CLAUDISH_ENABLED mid-session. A flag file can be checked fresh on
 # every invocation. Create it to pause rewrites instantly; remove it to resume.
-[ -f "${CLAUDISH_OFF_FILE:-$HOME/.claude/claudish-off}" ] && ENABLED=0
+# Every flag file sits in one directory, so a second host (the pi adapter) can
+# keep its own set; an individual *_FILE variable still wins over the directory.
+_cl_cfg="${CLAUDISH_CONFIG_DIR:-${HOME:-}/.claude}"
+[ -f "${CLAUDISH_OFF_FILE:-$_cl_cfg/claudish-off}" ] && ENABLED=0
 MODE="${CLAUDISH_MODE:-append}"
 # Runtime display-mode override written by /claudish (claudish-ctl.sh): like the
 # off-file, a file re-read per message flips append<->replace mid-session where
 # the frozen CLAUDISH_MODE env cannot. Only the two known values are honoured;
 # anything else (or no file) leaves the env/default in place.
-_mode_file="${CLAUDISH_MODE_FILE:-$HOME/.claude/claudish-mode}"
+_mode_file="${CLAUDISH_MODE_FILE:-$_cl_cfg/claudish-mode}"
 if [ -f "$_mode_file" ]; then
   case "$(cat "$_mode_file" 2>/dev/null | tr -d '[:space:]')" in
     append)  MODE=append ;;
@@ -105,7 +114,7 @@ fi
 # Like MODE, the env is the launch default and a flag file overrides it live.
 STYLE=""
 case "${CLAUDISH_STYLE:-}" in tldr|5y|caveman) STYLE="$CLAUDISH_STYLE" ;; esac
-_style_file="${CLAUDISH_STYLE_FILE:-$HOME/.claude/claudish-style}"
+_style_file="${CLAUDISH_STYLE_FILE:-$_cl_cfg/claudish-style}"
 if [ -f "$_style_file" ]; then
   case "$(cat "$_style_file" 2>/dev/null | tr -d '[:space:]')" in
     tldr)    STYLE=tldr ;;

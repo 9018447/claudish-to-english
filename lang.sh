@@ -62,7 +62,7 @@ claudish_language() {
   # — only a per-message file can be flipped without relaunching. `/claudish
   # language default` removes it and restores the resolution below. The file
   # persists across sessions (like the off-file); cleaned like every source.
-  _cl_file="${CLAUDISH_LANG_FILE:-${HOME:-}/.claude/claudish-lang}"
+  _cl_file="${CLAUDISH_LANG_FILE:-${CLAUDISH_CONFIG_DIR:-${HOME:-}/.claude}/claudish-lang}"
   if [ -f "$_cl_file" ]; then
     _cl_rv="$(_claudish_lang_clean "$(head -c 64 "$_cl_file" 2>/dev/null)")"
     if [ -n "$_cl_rv" ]; then printf '%s' "$_cl_rv"; return 0; fi
