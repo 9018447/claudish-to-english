@@ -524,17 +524,26 @@ file, the absolute path written is printed on stdout.
 
 ## pi-coding-agent extension
 
-The same rewrite runs inside pi-coding-agent, as a single-file extension at
-`pi/claudish.ts`. Install it from this checkout:
+The same rewrite runs inside pi-coding-agent, as an extension at
+`pi/claudish.ts`. Install the repository:
+
+```bash
+pi install https://github.com/9018447/claudish-to-english
+```
+
+The root `package.json` is what makes that work: its `"pi": {"extensions":
+["./pi/claudish.ts"]}` field is how pi discovers the extension in a package.
+It installs nothing and publishes nothing. If you would rather point pi at a
+checkout you already have, install the file directly:
 
 ```bash
 pi install /abs/path/to/claudish-to-english/pi/claudish.ts
 ```
 
-or put that absolute path in `"extensions"` in pi's settings. The checkout has
-to stay where it is: the extension calls the scripts in this folder instead of
-carrying its own copy, which is the point — one prompt, one provider layer, one
-set of language and style rules, and a fix to any of them reaches both tools.
+Either way the files have to stay where they are: the extension calls the
+scripts in this folder instead of carrying its own copy, which is the point —
+one prompt, one provider layer, one set of language and style rules, and a fix
+to any of them reaches both tools. `/claudish` appears after pi restarts.
 
 Everything above applies unchanged:
 

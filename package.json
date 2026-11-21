@@ -1,0 +1,9 @@
+{
+  "name": "claudish-to-english",
+  "version": "0.0.0",
+  "private": true,
+  "description": "pi-coding-agent entry point for the claudish-to-english scripts. Not published; the Claude Code plugin is described in .claude-plugin/plugin.json.",
+  "pi": {
+    "extensions": ["./pi/claudish.ts"]
+  }
+}

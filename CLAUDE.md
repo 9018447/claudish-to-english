@@ -24,6 +24,7 @@ the two ever disagree.
 | `commands/claudish.md` | the `/claudish` slash command |
 | `hooks/hooks.json` | wires the three hooks |
 | `pi/claudish.ts` | pi-coding-agent extension — an adapter that feeds pi's events to the scripts above; owns no prompt or provider logic |
+| `package.json` | pi's package manifest: one `pi.extensions` entry pointing at `pi/claudish.ts`, so `pi install <repo url>` discovers it. Installs nothing |
 
 Config precedence is consistent throughout: **flag file > env var > settings
 file > built-in default**. Flag files exist because env vars are frozen at
@@ -105,8 +106,13 @@ Test it the same way as a hook — `CLAUDISH_STUB=1` plus the `*_FILE=/nonexiste
 redirects, e.g. `CLAUDISH_STUB=1 pi -e ./pi/claudish.ts`. There is no build step
 and no test suite.
 
-There is also no `package.json`, so a bare `tsc --noEmit` cannot resolve pi's
-types. Point a throwaway tsconfig at the installed release:
+The root `package.json` exists only so pi can find the extension: `pi install`
+of the repository URL registers a package, and pi reads the manifest's
+`"pi": {"extensions": ["./pi/claudish.ts"]}` to discover what is in it. Without
+that field pi looks for a directory named `extensions/`, finds nothing, and
+`/claudish` never appears. The manifest installs nothing, so a bare
+`tsc --noEmit` still cannot resolve pi's types. Point a throwaway tsconfig at
+the installed release:
 
 ```sh
 PI_NM="$HOME/.pi/agent/install/releases/$(cat "$HOME/.pi/agent/install/current-version")/node_modules"

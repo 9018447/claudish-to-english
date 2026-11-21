@@ -39,6 +39,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     directory named `claudish-off` is not an off switch.
   - A session id that sanitises to `.` or `..` becomes `nosession`, because
     `rewrite.sh` builds its buffer directory from that field as-is.
+- **`pi install <repository url>` now finds the extension.** A root
+  `package.json` declares `"pi": {"extensions": ["./pi/claudish.ts"]}`. pi
+  discovers package resources through that manifest and otherwise only looks
+  for an `extensions/` directory, so the package installed and loaded nothing:
+  no rewrite, no `/claudish`.
 
 ## [0.10.0] - 2026-10-09
 
